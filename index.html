@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title></title>
+    <link rel="stylesheet" href="sins/MOMstyle.css" />
+    <script src='sins/jquery.min.js'></script>
+    <script src='sins/jquery-ui.min.js'></script>
+    <script src="sins/graph.ob.js"></script>
+    <script src="sins/graph_multiline_use.ob.js"></script>
+    <script type="text/javascript" >
+
+        var datapoints1 = [];
+        var datapoints2 = [];
+        var datapoints3 = [];
+        var datapoints4 = [];
+
+        let v1 = 4;
+        let v2 = 6;
+        //let R = 0.0287;
+        let R = 8.314;
+        let P1 = 1.0;
+        let P3 = 0.1;
+        let gamma = 1.667;
+
+        function draw() {
+
+            P2 = P1 * v1 / v2;
+            v3 = Math.pow(P2 / P3, 1 / gamma) * v2;
+            v4 = Math.pow(P1 * Math.pow(v1, gamma) / (P3 * v3), 1 / (gamma - 1));
+            P4 = P1 * Math.pow(v1 / v4, gamma);
+
+            W = P1 * v1 * Math.log(v2 / v1) + P3 * v3 * Math.log(v4 / v3);
+            Q1 = P1 * v1 * Math.log(v2 / v1);
+            Q2 = Q1 - W;
+            eta = W / Q1 * 100;
+
+            T1 = P1 * v1 / R;
+            T2 = P3 * v3 / R;
+            eta1 = (1 - (T2 / T1)) * 100;
+
+            for (i = v1; i <= v2; i = i + 0.001) {
+                // if (i == v1) {
+                //     datapoints1.push({x: i, y: (P1 * v1) / i, indexLabel: "1"});
+                // } else {
+                    datapoints1.push({x: i, y: (P1 * v1) / i});
+                }
+            // }
+
+            // //bc 2nd
+            // for (j = v2; j <= v3; j = j + 0.001) {
+            //     if (j == v2) {
+            //         datapoints2.push({x: j, y: P2 * Math.pow(v2, gamma) / Math.pow(j, gamma), indexLabel: "2"});
+            //     } else {
+            //         datapoints2.push({x: j, y: P2 * Math.pow(v2, gamma) / Math.pow(j, gamma)});
+            //     }
+            // }
+            //
+            // for(m=v1; m<=v4; m=m+0.001) {
+            //     if (m == v1) {
+            //         datapoints2.push({x: j, y: P2 * Math.pow(v2, gamma) / Math.pow(j, gamma), indexLabel: "3"});
+            //     } else {
+            //         datapoints4.push({x: m, y: P1 * Math.pow(v1, gamma) / Math.pow(m, gamma)});
+            //     }
+            // }
+            //
+            // //cd 3rd
+            // for (k = v4; k <= v3; k = k + 0.001) {
+            //     if (k == v4) {
+            //         datapoints3.push({x: k, y: (P3 * v3) / k, indexLabel: "4"});
+            //     } else {
+            //         datapoints3.push({x: k, y: (P3 * v3) / k});
+            //     }
+            // }
+
+            var data = [];
+            data.push({
+                type: "spline",
+                xValueType: "Float",
+                showInLegend: true,
+                name: "Isentropic Expansion",
+                markerSize: 1,
+                toolTipContent: "<strong>a</strong>: {y}, <strong>b</strong>: {x}",
+                dataPoints: datapoints1
+            })
+
+            data.push({
+                type: "spline",
+                xValueType: "Float",
+                showInLegend: true,
+                name: "Constant Volume Heat Rejection",
+                markerSize: 1,
+                dataPoints: datapoints2
+            })
+            data.push({
+                type: "spline",
+                xValueType: "Float",
+                showInLegend: true,
+                name: "Isentropic Compression",
+                markerSize: 1,
+                dataPoints: datapoints3
+            })
+            data.push({
+                type: "spline",
+                xValueType: "Float",
+                showInLegend: true,
+                name: "Constant Volume Combustion",
+                markerSize: 1,
+                dataPoints: datapoints4
+            })
+
+            graphline("simscreen1", data, "Volume(m³)", "Pressure(kPa)");
+        }
+        draw();
+        var rodtravel=0;
+        var force=0;
+        var work=0;
+        var energy=0;
+        var heat=0;
+        var flag=true;
+        var step=0;
+
+        function dummy() {
+
+            window.requestAnimFrame = (function(){
+                return window.requestAnimationFrame     ||
+                    window.webkitRequestAnimationFrame  ||
+                    window.mozRequestAnimationFrame     ||
+                    window.oRequestAnimationFrame       ||
+                    window.msRequestAnimationFrame      ||
+                    function( callback ) {
+                        window.setTimeout(callback, 1000 / 60);
+                    };
+            })();
+
+            var canvas = document.getElementById('simscreen'),
+                ctx = canvas.getContext('2d'),
+                crankCaseColor = '#9EA18C',
+                pistonColor = '#676482',
+                test='#f4eeff',
+                left_wall_x=30,
+                left_wall_y_start=150,
+                left_wall_y_end=350,
+                right_wall_x=150,
+                right_wall_y_start=150,
+                right_wall_y_end=350,
+                piston_width=right_wall_x-left_wall_x,
+                piston_height = 40,
+                piston_x=30,
+                piston_y=220,
+
+                cylinder = {
+                    draw : function () {
+
+                        ctx.strokeStyle = crankCaseColor;
+                        ctx.fillStyle = crankCaseColor;
+                        ctx.lineWidth = 4;
+
+                        // left cylinder wall
+
+                        ctx.beginPath();
+                        ctx.moveTo(left_wall_x,left_wall_y_start);
+                        ctx.lineTo(left_wall_x,left_wall_y_end);
+                        ctx.stroke();
+
+                        // right cylinder wall
+
+                        ctx.beginPath();
+                        ctx.moveTo(right_wall_x,right_wall_y_start);
+                        ctx.lineTo(right_wall_x,right_wall_y_end);
+                        ctx.stroke();
+
+                        // bottom cylinder wall
+
+                        ctx.beginPath();
+                        ctx.moveTo(left_wall_x,left_wall_y_end);
+                        ctx.lineTo(right_wall_x,right_wall_y_end);
+                        ctx.font = "20px Arial";
+                        // ctx.fillStyle = "#ff00ff";
+                        ctx.fillText("Q2 ",piston_x+2+45,piston_y+step+120);
+                        ctx.fillText("Q1 ",piston_x+2+45,piston_y+step+200);
+                        ctx.stroke();
+
+                        // piston
+
+                        ctx.beginPath();
+                        ctx.fillStyle = pistonColor;
+                        ctx.fillRect(piston_x+2,piston_y+step,piston_width-4,piston_height);
+                        ctx.font = "20px Arial";
+                        ctx.fillText("Work ",piston_x+2+35,piston_y+step-120);
+                        ctx.stroke();
+
+                        // cavity
+
+                        ctx.beginPath();
+                        ctx.fillStyle = test;
+                        ctx.fillRect(piston_x+2,piston_y+piston_height+step,piston_width-4,88-step);
+                        ctx.stroke();
+
+                        // connecting rod
+
+                        ctx.beginPath();
+                        ctx.strokeStyle = pistonColor;
+                        ctx.fillStyle = pistonColor;
+                        ctx.lineWidth = 10;
+                        ctx.moveTo((right_wall_x + left_wall_x)/2,piston_y+step);
+                        ctx.lineTo((right_wall_x + left_wall_x)/2,piston_y+step-70);
+                        ctx.lineCap = 'round';
+                        ctx.stroke();
+
+                        if(flag === false){
+
+                            work=Math.round(step)*force;
+                            energy=parseInt(heat)-parseInt(rodtravel);
+
+                            if(step<-0.5 * rodtravel){
+
+                                step+=0.2;
+
+                                // document.getElementById("p1").innerHTML="Work done by the system : "+rodtravel+" J";
+                                //document.getElementById("p5").innerHTML="Work done by the system : "+work+" J";
+                                // document.getElementById("p4").innerHTML="Change in Internal Energy, &Delta;U : "+energy+" J";
+
+                            }
+                            else{
+
+                                step-=0.2;
+                                // document.getElementById("p1").innerHTML="Work done by the system : "+rodtravel+" J";
+                                //document.getElementById("p5").innerHTML="Work done by the system : "+work+" J";
+                                // document.getElementById("p4").innerHTML="Change in Internal Energy, &Delta;U : "+energy+" J";
+
+                            }
+                        }
+                        else{
+                            step=0;
+                        }
+                    }
+                };
+
+            (function animloop(){
+                requestAnimFrame(animloop);
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                cylinder.draw();
+            })();
+draw();
+        }
+
+
+        function simstate() {
+
+            if (flag===true){
+                document.getElementById('playpausebutton').src="sins/bluepausedull.png";
+                flag=false;
+
+                // $('#l1spinner').spinner("disable");
+                // //$('#l2spinner').spinner("disable");
+                // $('#l3spinner').spinner("disable");
+                // $('#l4spinner').spinner("disable");
+                //
+                // $('#l1slider').slider("disable");
+                // //$('#l2slider').slider("disable");
+                // $('#l3slider').slider("disable");
+                // $('#l4slider').slider("disable");
+
+                if (rodtravel===0){
+                    if(heat===0){
+                        // document.getElementById("p6").innerHTML="It is an Isolated System.";
+                    }
+                    // else{
+                    // document.getElementById("p6").innerHTML="The process is Isochoric";
+                    // }
+                }
+                else if (energy===0){
+                    // document.getElementById("p6").innerHTML="The process is Isothermal.";
+                }
+                else if(heat===0){
+                    // document.getElementById("p6").innerHTML="The process is adiabatic.";
+                }
+
+            }
+
+            else {
+                document.getElementById('playpausebutton').src="sins/blueplaydull.png";
+                flag=true;
+
+                // $('#l1spinner').spinner("enable");
+                // //$('#l2spinner').spinner("enable");
+                // $('#l3spinner').spinner("enable");
+                // $('#l4spinner').spinner("enable");
+                //
+                // $('#l1slider').slider("enable");
+                // //$('#l2slider').slider("enable");
+                // $('#l3slider').slider("enable");
+                // $('#l4slider').slider("enable");
+
+                document.getElementById("p6").innerHTML="";
+
+            }
+        }
+
+        function travel_val(input){
+
+            rodtravel=input+10;
+            // document.getElementById("p1").innerHTML="Work done by the system : "+rodtravel+" J";
+        }
+
+        function force_val(input){
+
+            force=input;
+            // document.getElementById("p2").innerHTML="Force exerted : "+force+" N";
+
+        }
+
+        function heat_val(input){
+
+            heat=input;
+            // document.getElementById("p3").innerHTML="Heat added to the system : "+heat+" J";
+
+        }
+
+        function energy_val(input){
+
+            energy=input;
+            // document.getElementById("p4").innerHTML="Change in Internal Energy, &Delta;U : "+energy+" J";
+
+        }
+
+        function work_val(){
+
+            work=parseInt(force*rodtravel);
+            // document.getElementById("p5").innerHTML="Work done by the system : "+work+" J";
+
+        }
+
+        // function randomise(){
+        //
+        //     let rand_distance = Math.floor(Math.random() * 81) - 40;
+        //     let rand_heat=Math.floor(Math.random() * 81) - 40;
+        //     let rand_force=Math.floor(Math.random() * 81) - 40;
+        //     if(energy === rand_heat - rand_distance){
+        //
+        //         console.log(energy,rand_heat,rand_distance);
+        //         heat=rand_heat;
+        //         rodtravel=rand_distance;
+        //         force=rand_force;
+        //
+        //         $('#l1spinner').spinner("value",rodtravel);
+        //         $('#l1slider').slider("value",rodtravel);
+        //
+        //         $('#l2spinner').spinner("value",force);
+        //         $('#l2slider').slider("value",force);
+        //
+        //         $('#l3spinner').spinner("value",heat);
+        //         $('#l3slider').slider("value",heat);
+        //
+        //         travel_val(rodtravel);
+        //         force_val(force);
+        //         heat_val(heat);
+        //         work_val();
+        //
+        //     }
+        //     else{
+        //         randomise();
+        //     }
+        // }
+
+        function varinit()
+        {
+
+            varchange();
+
+            //Variable r1 slider and number input types
+
+            $('#l1slider').slider("value", 0);
+            $('#l1spinner').spinner("value", 0);
+            $('#l2slider').slider("value", 0);
+            $('#l2spinner').spinner("value", 0);
+            $('#l3slider').slider("value", 0);
+            $('#l3spinner').spinner("value", 0);
+            $('#l4slider').slider("value", 0);
+            $('#l4spinner').spinner("value", 0);
+
+            travel_val(0);
+            work_val(0);
+            energy_val(0);
+            force_val(0);
+            heat_val(0);
+
+        }
+
+        function varchange()
+        {
+
+            // Variable r1 slider and number input types
+
+            $('#l1slider').slider({ max : 40, min : -40, step : 1 });		    // slider initialisation : jQuery widget
+            $('#l1spinner').spinner({ max : 40, min : -40, step : 1 });		    // number initialisation : jQuery widget
+            $('#l2slider').slider({ max : 40, min : -40, step : 1 });		    // slider initialisation : jQuery widget
+            $('#l2spinner').spinner({ max : 40, min : -40, step : 1 });		    // number initialisation : jQuery widget
+            $('#l3slider').slider({ max : 40, min : -40, step : 1 });		    // slider initialisation : jQuery widget
+            $('#l3spinner').spinner({ max : 40, min : -40, step : 1 });		    // number initialisation : jQuery widget
+            $('#l4slider').slider({ max : 80, min : -80, step : 1 });		// slider initialisation : jQuery widget
+            $('#l4spinner').spinner({ max : 80, min : -80, step : 1 });		// number initialisation : jQuery widget
+
+            // monitoring change in value and connecting slider and number
+            // monitoring change in value and connecting slider and number
+            // setting trace point coordinate arrays to empty on change of link length
+
+            // travel
+
+            $( "#l1slider" ).on(  "slide",  function( e, ui ) {$('#l1spinner').spinner("value",ui.value);travel_val(ui.value); work_val();
+                $('#l4spinner').spinner("value",heat-rodtravel);
+                $('#l4slider').slider("value",heat-rodtravel);energy_val(heat-rodtravel);});
+
+            $( "#l1spinner" ).on( "spin",   function( e, ui ) {$('#l1slider').slider("value",ui.value);travel_val(ui.value); work_val();
+                $('#l4spinner').spinner("value",heat-rodtravel);
+                $('#l4slider').slider("value",heat-rodtravel);energy_val(heat-rodtravel);});
+
+            $( "#l1spinner" ).on( "change", function() {varchange() } );
+
+            // force
+
+            $( "#l2slider" ).on(  "slide",  function( e, ui ) {$('#l2spinner').spinner("value",ui.value);force_val(ui.value);work_val();
+                $('#l4spinner').spinner("value",heat-work);
+                $('#l4slider').slider("value",heat-work);energy_val(heat-work);});
+
+            $( "#l2spinner" ).on( "spin",   function( e, ui ) {$('#l2slider').slider("value",ui.value);force_val(ui.value);work_val();
+                $('#l4spinner').spinner("value",heat-work);
+                $('#l4slider').slider("value",heat-work);energy_val(heat-work);});
+
+            $( "#l2spinner" ).on( "change", function() {varchange() } );
+
+            // heat
+
+            $( "#l3slider" ).on(  "slide",  function( e, ui ) {$('#l3spinner').spinner("value",ui.value);heat_val(ui.value);
+                $('#l4spinner').spinner("value",heat-rodtravel);
+                $('#l4slider').slider("value",heat-rodtravel);energy_val(heat-rodtravel);});
+
+            $( "#l3spinner" ).on( "spin",   function( e, ui ) {$('#l3slider').slider("value",ui.value);heat_val(ui.value);
+                $('#l4spinner').spinner("value",heat-rodtravel);
+                $('#l4slider').slider("value",heat-rodtravel);energy_val(heat-rodtravel);});
+
+            $( "#l3spinner" ).on( "change", function() {varchange() } );
+
+            // energy
+
+            $( "#l4slider" ).on(  "slide",  function( e, ui ) {$('#l4spinner').spinner("value",ui.value);energy_val(ui.value);randomise();} );
+
+            $( "#l4spinner" ).on( "spin",   function( e, ui ) {$('#l4slider').slider("value",ui.value);energy_val(ui.value);randomise();} );
+
+            $( "#l4spinner" ).on( "change", function() {varchange();randomise();} );
+
+            travel_val($('#l1spinner').spinner("value"));
+            force_val($('#l2spinner').spinner("value"));
+            heat_val($('#l3spinner').spinner("value"));
+            energy_val($('#l4spinner').spinner("value"));
+            work_val();
+
+            varupdate();
+        }
+
+        function varupdate()
+        {
+
+            $('#l1slider').slider("value", $('#l1spinner').spinner('value'));  //updating slider location with change in spinner(debug)
+            $('#l2slider').slider("value", $('#l2spinner').spinner('value'));  //updating slider location with change in spinner(debug)
+            $('#l3slider').slider("value", $('#l3spinner').spinner('value'));  //updating slider location with change in spinner(debug)
+            $('#l4slider').slider("value", $('#l4spinner').spinner('value'));  //updating slider location with change in spinner(debug)
+
+        }
+
+    </script>
+</head>
+
+<body onload="varinit();dummy();draw();">
+
+<!-- Defining Container for Simulation -->
+<noscript>
+    The simulation requires JavaScript to be enabled.
+</noscript>
+<div id="container">
+    <!-- Replace TITLE with simulation title to be displayed next to logo-->
+    <div id="simtitle"></div>
+    <!-- Region for simulation display -->
+    <div id="simscreen1" style="position: absolute; top: 100px; left: 240px;width:350px;height:400px"></div>
+    <canvas id="simscreen" height="400px" width="200px"></canvas>
+    <div id="titleincanvas"></div>
+    <!-- Region for comment / question prompts -->
+    <div id="commentboxleft">
+        <p id="p1" style="line-height:0.4"></p>
+        <p id="p2" style="line-height:0.4"></p>
+        <p id="p3" style="line-height:0.4"></p>
+    </div>
+    <div id="commentboxright">
+        <p id="p4" style="line-height:0.4"></p>
+        <p id="p5" style="line-height:0.4"></p>
+        <p id="p6" style="line-height:0.4"></p>
+        <p id="p7" style="line-height:0.4" id="arrow" &#8593;></p>
+    </div>
+
+    <!-- DND-Title of region for variables display -->
+    <div id="vartitle">VARIABLES</div>
+
+    <!-- Region for Input parameters of simulation -->
+    <div id="variables">
+        <div class="variable">
+            <div class="varname"><p title="Link Length" style="font-size:95%;">P<sub>1</sub> (kPa)</p>
+                <input id="l1spinner"/></div>
+            <div id="l1slider"></div>
+        </div>
+<!--        <div class="variable">-->
+<!--            <div class="varname"><p title="Link Length" style="font-size:95%;">P<sub>3</sub> (kPa)</p>-->
+<!--                <input id="l2spinner"/></div>-->
+<!--            <div id="l2slider"></div>-->
+<!--        </div>-->
+<!--        <div class="variable">-->
+<!--            <div class="varname"><p title="Link Length" style="font-size:95%;">v<sub>1</sub> (m<sup>3</sup>)</p>-->
+<!--                <input id="l3spinner"/></div>-->
+<!--            <div id="l3slider"></div>-->
+<!--        </div>-->
+<!--        <div class="variable">-->
+<!--            <div class="varname"><p title="Link Length" style="font-size:95%;">v<sub>2</sub> (m<sup>3</sup>)</p>-->
+<!--                <input id="l4spinner"/></div>-->
+<!--            <div id="l4slider"></div>-->
+<!--        </div>-->
+    </div>
+    <!-- DND-Title of region for controls display -->
+    <div id="ctrltitle">CONTROLS</div>
+    <!-- Region for User controls of simulation -->
+    <div id="controls">
+        <img id="playpausebutton" onclick="simstate();" src="sins/blueplaydull.png" />
+        <img id="rotationbutton" onclick="location.reload();" src="sins/bluecwdull.png" />
+        <div style="position:relative; left: 15px;top:-60px;">
+            <button class="tooltip"  style="border-bottom:0px dotted ; color:black;top: 15px; text-align:justify;left: 5px"><b>Symbols</b>
+                <span class="tooltiptext" style="left: 0px;width: 300px">
+			Process 1-2 = Isothermal Heat Addition<br>
+            Process 2-3 = Isentropic Expansion<br>
+            Process 3-4 = Isothermal Heat Rejection<br>
+            Process 4-1 = Isentropic Compression<br>
+                P = Pressure<br>
+                v = Volume<br>
+                γ = Heat Capacity Ratio (or Adiabatic Index) = 1.667<br>
+                T<sub>1</sub> = Temperature of the hot reservoir<br>
+                T<sub>2</sub> = Temperature of the cold reservoir<br>
+                Q<sub>1</sub> = Heat absorbed by the system<br>
+                W = Work done by the system<br>
+                Q<sub>2</sub> = Heat lost by the system
+			</span>
+            </button>
+
+            <button class="tooltip" style="border-bottom:0px dotted ; color:black;top: 15px; text-align:justify;left: 80px"><b>Formulae</b>
+                <span class="tooltiptext" style="left: -60px; width: 220px">
+            Process 1-2 -> Pv = constant<br>
+            Process 2-3 -> Pv<sup>γ</sup> = constant<br>
+            Process 3-4 -> Pv = constant<br>
+            Process 4-1 -> Pv<sup>γ</sup> = constant<br>
+             T<sub>1</sub> = P<sub>1</sub>v<sub>1</sub>/R<br>
+                T<sub>2</sub> = P<sub>3</sub>v<sub>3</sub>/R<br>
+                Q<sub>1</sub> = nRT<sub>1</sub>ln(v2/v1)<br>
+                W = nRT<sub>1</sub>ln(v2/v1) + nRT<sub>2</sub>ln(v4/v3)<br>
+                Q<sub>2</sub> = Q<sub>1</sub> - W<br>
+                Efficiency = W/Q<sub>1</sub> = 1 - T<sub>2</sub>/T<sub>1</sub><br>
+
+			</span>
+            </button>
+        </div>
+        </div>
+
+    </div>
+    <!-- DND-Copyright display-->
+    <div id="copyright" title="Developer : SOLVEr"> Copyright &copy; SOLVE The Virtual Lab @ NITK Surathkal </div>
+
+</div><!-- Container div close -->
+</body>
+</html>
